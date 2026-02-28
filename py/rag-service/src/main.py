@@ -354,7 +354,19 @@ with Path.open(config_file, "w") as f:
 
 chroma_collection = chroma_client.get_or_create_collection("documents")  # pyright: ignore
 vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+
+# Persist LlamaIndex index metadata (docstore/index_store) alongside the Chroma vector store.
+# IMPORTANT: do not pass persist_dir into StorageContext.from_defaults().
+# When persist_dir is set there, LlamaIndex tries to eagerly *load* docstore.json on startup,
+# which crashes on first run.
+LLAMAINDEX_PERSIST_DIR = BASE_DATA_DIR / "llamaindex"
+LLAMAINDEX_PERSIST_DIR.mkdir(parents=True, exist_ok=True)
+
+# Base storage context for vector store operations. For *loading* an existing LlamaIndex
+# index, we'll build a separate StorageContext that includes persist_dir.
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
+
 
 try:
     embed_extra = json.loads(rag_embed_extra) if rag_embed_extra is not None else {}
@@ -403,10 +415,22 @@ Settings.llm = llm_model
 
 
 try:
-    index = load_index_from_storage(storage_context)
+    # IMPORTANT: Persisted index metadata (index_store/docstore) is separate from Chroma.
+    # We must provide a StorageContext that also loads docstore/index_store from persist_dir.
+    storage_context_with_persist = StorageContext.from_defaults(
+        vector_store=vector_store,
+        persist_dir=str(LLAMAINDEX_PERSIST_DIR),
+    )
+    index = load_index_from_storage(storage_context_with_persist)
 except (OSError, ValueError) as e:
     logger.error("Failed to load index from storage: %s", e)
     index = VectorStoreIndex([], storage_context=storage_context)
+else:
+    # Keep the module-level storage_context pointing at the loaded one.
+    storage_context = storage_context_with_persist
+
+
+
 
 
 class ResourceURIRequest(BaseModel):
@@ -567,6 +591,10 @@ def process_document_batch(documents: list[Document]) -> bool:  # noqa: PLR0915,
             if valid_documents:
                 with index_lock:
                     index.refresh_ref_docs(valid_documents)
+
+                    # Persist index metadata so it can be loaded after container restart
+                    # without re-embedding all files.
+                    storage_context.persist(persist_dir=str(LLAMAINDEX_PERSIST_DIR))
 
             # Update status to completed for successfully processed documents
             for doc in valid_documents:
