@@ -79,6 +79,8 @@ function M.launch_rag_service(cb)
 
   local port = M.get_rag_service_port()
 
+  local tz = (vim.env.TZ and vim.env.TZ ~= "" and vim.env.TZ) or "Asia/Seoul"
+
   if M.get_rag_service_runner() == "docker" then
     local image = M.get_rag_service_image()
     local data_path = M.get_data_path()
@@ -109,12 +111,13 @@ function M.launch_rag_service(cb)
       M.stop_rag_service()
     end
     local cmd_ = string.format(
-      "docker run --platform=linux/amd64 -d -p 0.0.0.0:%d:%d --name %s -v %s:/data -v %s:/host:ro -e ALLOW_RESET=TRUE -e DATA_DIR=/data -e RAG_EMBED_PROVIDER=%s -e RAG_EMBED_ENDPOINT=%s -e RAG_EMBED_API_KEY=%s -e RAG_EMBED_MODEL=%s -e RAG_EMBED_EXTRA=%s -e RAG_LLM_PROVIDER=%s -e RAG_LLM_ENDPOINT=%s -e RAG_LLM_API_KEY=%s -e RAG_LLM_MODEL=%s -e RAG_LLM_EXTRA=%s %s %s",
+      "docker run --platform=linux/amd64 -d -p 0.0.0.0:%d:%d --name %s -v %s:/data -v %s:/host:ro -e TZ=%s -e ALLOW_RESET=TRUE -e DATA_DIR=/data -e RAG_EMBED_PROVIDER=%s -e RAG_EMBED_ENDPOINT=%s -e RAG_EMBED_API_KEY=%s -e RAG_EMBED_MODEL=%s -e RAG_EMBED_EXTRA=%s -e RAG_LLM_PROVIDER=%s -e RAG_LLM_ENDPOINT=%s -e RAG_LLM_API_KEY=%s -e RAG_LLM_MODEL=%s -e RAG_LLM_EXTRA=%s %s %s",
       M.get_rag_service_port(),
       M.get_rag_service_port(),
       container_name,
       data_path,
       Config.rag_service.host_mount,
+	  tz,
       Config.rag_service.embed.provider,
       Config.rag_service.embed.endpoint,
       embed_api_key,
