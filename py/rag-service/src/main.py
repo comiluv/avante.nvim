@@ -512,7 +512,7 @@ def process_document_batch(documents: list[Document]) -> bool:  # noqa: PLR0915,
 
             # Check if document with same hash has already been successfully processed
             status_records = indexing_history_service.get_indexing_status(doc=doc)
-            if status_records and status_records[0].status == "completed":
+            if status_records and (status_records[0].status == "completed" or status_records[0].status == "failed"):
                 logger.debug(
                     "Document with same hash already processed, skipping: %s",
                     doc.doc_id,
