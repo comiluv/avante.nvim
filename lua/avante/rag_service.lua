@@ -254,9 +254,10 @@ function M.to_local_uri(uri)
 end
 
 function M.is_ready()
+  local nulldev = (jit.os == "Windows") and "NUL" or "/dev/null"
   return vim
     .system(
-      { "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", M.get_rag_service_url() .. "/api/health" },
+      { "curl", "-s", "-o", nulldev, "-w", "%{http_code}", M.get_rag_service_url() .. "/api/health" },
       { text = true }
     )
     :wait().code == 0
